@@ -767,10 +767,12 @@ nearestBtn.addEventListener("click", async () => {
   if(!ready){ nearestBtn.disabled = false; return; }
 
   const SELF_RADIUS_KM = 0.03; // 약 30m 이내는 같은 매장(자기 자신)으로 간주해 제외
+  const selectedRegion = regionSelect.value;
 
   const ranked = STORE_INDEX
     .map((s, i) => ({ ...s, lat: STORE_DB[i].lat, lng: STORE_DB[i].lng }))
     .filter(s => typeof s.lat === "number" && typeof s.lng === "number")
+    .filter(s => storeMatchesRegion(s, selectedRegion)) // 선택된 광역지자체 안의 매장만 정렬 대상으로 삼는다
     .filter(s => !(selfMatch && s.name === selfMatch.name)) // 매장명이 일치하는 자기 자신 제외
     .map(s => ({ ...s, dist: haversineKm(base.lat, base.lng, s.lat, s.lng) }))
     .filter(s => s.dist > SELF_RADIUS_KM) // 좌표가 사실상 동일한 경우도 자기 자신으로 보고 제외
@@ -787,7 +789,7 @@ nearestBtn.addEventListener("click", async () => {
   });
   if(ranked.length === 0) addStoreRow();
 
-  nearestStatus.textContent = `가까운 매장 ${ranked.length}곳을 자동으로 채웠습니다 (검색하신 매장 제외, 직선거리 기준).${addressNote}`;
+  nearestStatus.textContent = `"${selectedRegion}" 지역 내 가까운 매장 ${ranked.length}곳을 자동으로 채웠습니다 (검색하신 매장 제외, 직선거리 기준).${addressNote}`;
   nearestBtn.disabled = false;
 });
 
