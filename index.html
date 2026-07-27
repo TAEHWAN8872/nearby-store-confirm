@@ -247,9 +247,10 @@
     <div class="field">
       <label for="storeAddress">매장 주소지</label>
       <div style="display:flex; gap:8px;">
-        <input type="text" id="storeAddress" placeholder="예) 경기도 화성시 병점노을4로 29 L타워 108호" style="flex:1;" />
+        <input type="text" id="storeAddress" placeholder="예) 경기도 화성시 병점노을4로 29 L타워 108호 (또는 매장명으로도 검색 가능)" style="flex:1;" />
         <button type="button" class="ghost-btn" id="nearestBtn" style="white-space:nowrap;">가까운 순 자동 정렬</button>
       </div>
+      <div class="hint">정확한 주소가 아니어도 매장명(상호명)을 입력하면 검색됩니다.</div>
       <div class="hint" id="nearestStatus"></div>
     </div>
     <div class="field" style="margin-bottom:0">
@@ -576,25 +577,45 @@ const nearestStatus = document.getElementById("nearestStatus");
 let geocoder = null;
 let geocodingReady = false;
 
+let placesSearch = null;
+
 function initGeocoder(){
   if(typeof kakao === "undefined" || !kakao.maps || !kakao.maps.services){
     nearestStatus.textContent = "카카오맵 키가 설정되지 않았습니다 (스크립트 상단의 373f651aa208f760e79254dc82babe98를 발급받은 키로 교체해주세요).";
     return false;
   }
   geocoder = new kakao.maps.services.Geocoder();
+  placesSearch = new kakao.maps.services.Places();
   return true;
 }
 
-function geocodeOne(address){
+// 키워드(매장명/상호명 등)로 장소를 검색해 좌표를 찾는다.
+function keywordSearchOne(keyword){
   return new Promise((resolve) => {
-    geocoder.addressSearch(address, (result, status) => {
+    if(!placesSearch){ resolve(null); return; }
+    placesSearch.keywordSearch(keyword, (result, status) => {
       if(status === kakao.maps.services.Status.OK && result.length > 0){
         resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
       } else {
-        resolve(null); // 실패한 주소는 null로 남기고 넘어감
+        resolve(null);
       }
     });
   });
+}
+
+// 1) 정확한 주소 검색을 먼저 시도하고, 실패하면 2) 매장명 등 키워드 장소검색으로 한 번 더 시도한다.
+async function geocodeOne(query){
+  const byAddress = await new Promise((resolve) => {
+    geocoder.addressSearch(query, (result, status) => {
+      if(status === kakao.maps.services.Status.OK && result.length > 0){
+        resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
+      } else {
+        resolve(null);
+      }
+    });
+  });
+  if(byAddress) return byAddress;
+  return keywordSearchOne(query); // 주소로 못 찾으면 매장명/상호명으로 재시도
 }
 
 function haversineKm(lat1, lng1, lat2, lng2){
