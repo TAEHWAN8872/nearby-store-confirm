@@ -777,12 +777,15 @@ nearestBtn.addEventListener("click", async () => {
     .sort((a, b) => a.dist - b.dist)
     .slice(0, 10);
 
-  const rows = [...storeRowsEl.querySelectorAll("tr")];
-  ranked.forEach((s, i) => {
-    if(!rows[i]) return;
-    applyStoreToRow(rows[i], s);
-    rows[i].querySelector(".f-name").title = `직선거리 약 ${s.dist.toFixed(2)}km`;
+  // 표를 비우고 정확히 정렬 결과만큼(최대 10개)만 다시 채운다 (지역 선택 등으로 남아있던 행이 섞이지 않도록).
+  storeRowsEl.innerHTML = "";
+  rowCount = 0;
+  ranked.forEach(s => {
+    addStoreRow({ name: s.display, address: s.address, phone: s.phone });
+    const rows = storeRowsEl.querySelectorAll("tr");
+    rows[rows.length - 1].querySelector(".f-name").title = `직선거리 약 ${s.dist.toFixed(2)}km`;
   });
+  if(ranked.length === 0) addStoreRow();
 
   nearestStatus.textContent = `가까운 매장 ${ranked.length}곳을 자동으로 채웠습니다 (검색하신 매장 제외, 직선거리 기준).${addressNote}`;
   nearestBtn.disabled = false;
