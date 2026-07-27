@@ -608,20 +608,27 @@ for(let i=0;i<10;i++) addStoreRow();
 const regionFilterStatus = document.getElementById("regionFilterStatus");
 
 function fillRowsWithRegionStores(region){
-  const matches = STORE_INDEX.filter(s => storeMatchesRegion(s, region));
+  const allMatches = STORE_INDEX.filter(s => storeMatchesRegion(s, region));
+  const MAX_ROWS = 10;
+  const matches = allMatches.slice(0, MAX_ROWS);
 
   // 기존 표를 비우고 선택한 지역의 매장으로 다시 채운다.
   storeRowsEl.innerHTML = "";
   rowCount = 0;
 
-  if(matches.length === 0){
+  if(allMatches.length === 0){
     addStoreRow();
     regionFilterStatus.textContent = `"${region}" 지역에 등록된 매장이 없습니다. 직접 입력해주세요.`;
     return;
   }
 
   matches.forEach(m => addStoreRow({ name: m.display, address: m.address, phone: m.phone }));
-  regionFilterStatus.textContent = `"${region}" 지역 매장 ${matches.length}곳을 표에 채웠습니다. 필요 시 행을 추가/삭제하거나 직접 수정할 수 있습니다.`;
+
+  if(allMatches.length > MAX_ROWS){
+    regionFilterStatus.textContent = `"${region}" 지역 매장 ${allMatches.length}곳 중 ${MAX_ROWS}곳을 표에 채웠습니다. (+ 매장 추가로 나머지도 직접 채울 수 있습니다)`;
+  } else {
+    regionFilterStatus.textContent = `"${region}" 지역 매장 ${allMatches.length}곳을 표에 채웠습니다.`;
+  }
 }
 
 regionSelect.addEventListener("change", () => {
