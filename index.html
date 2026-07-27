@@ -589,13 +589,15 @@ function initGeocoder(){
   return true;
 }
 
-// 키워드(매장명/상호명 등)로 장소를 검색해 좌표를 찾는다.
+// 키워드(매장명/상호명 등)로 장소를 검색해 좌표와 실제 주소를 함께 찾는다.
 function keywordSearchOne(keyword){
   return new Promise((resolve) => {
     if(!placesSearch){ resolve(null); return; }
     placesSearch.keywordSearch(keyword, (result, status) => {
       if(status === kakao.maps.services.Status.OK && result.length > 0){
-        resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
+        const p = result[0];
+        const address = (p.road_address_name && p.road_address_name.trim()) || p.address_name || "";
+        resolve({ lat: parseFloat(p.y), lng: parseFloat(p.x), address });
       } else {
         resolve(null);
       }
@@ -603,7 +605,9 @@ function keywordSearchOne(keyword){
   });
 }
 
-// 1) 정확한 주소 검색을 먼저 시도하고, 실패하면 2) 매장명 등 키워드 장소검색으로 한 번 더 시도한다.
+// 1) 정확한 주소 검색을 먼저 시도하고, 2) 실패하면 매장명 등 키워드 장소검색,
+// 3) 그래도 안 되면 브랜드명("복호두")을 뗀 매장명으로 한 번 더 검색한다.
+// (카카오 장소 DB에는 "복호두"가 빠진 상호명으로 등록된 경우가 있어 이 단계가 필요합니다.)
 async function geocodeOne(query){
   const byAddress = await new Promise((resolve) => {
     geocoder.addressSearch(query, (result, status) => {
@@ -615,7 +619,15 @@ async function geocodeOne(query){
     });
   });
   if(byAddress) return byAddress;
-  return keywordSearchOne(query); // 주소로 못 찾으면 매장명/상호명으로 재시도
+
+  const byKeyword = await keywordSearchOne(query);
+  if(byKeyword) return byKeyword;
+
+  const stripped = query.replace(/복호두/g, "").replace(/\s+/g, " ").trim();
+  if(stripped && stripped !== query){
+    return keywordSearchOne(stripped);
+  }
+  return null;
 }
 
 function haversineKm(lat1, lng1, lat2, lng2){
@@ -659,7 +671,8 @@ async function ensureStoreGeocoding(){
 }
 
 nearestBtn.addEventListener("click", async () => {
-  const addr = document.getElementById("storeAddress").value.trim();
+  const storeAddressInput = document.getElementById("storeAddress");
+  const addr = storeAddressInput.value.trim();
   if(!addr){
     nearestStatus.textContent = "매장 주소지를 먼저 입력해주세요.";
     return;
@@ -670,9 +683,16 @@ nearestBtn.addEventListener("click", async () => {
   nearestStatus.textContent = "기준 주소 좌표 확인 중...";
   const base = await geocodeOne(addr);
   if(!base){
-    nearestStatus.textContent = "입력하신 주소의 좌표를 찾지 못했습니다. 주소를 다시 확인해주세요.";
+    nearestStatus.textContent = "입력하신 주소(또는 매장명)의 좌표를 찾지 못했습니다. 다시 확인해주세요.";
     nearestBtn.disabled = false;
     return;
+  }
+
+  // 매장명(키워드)으로 찾은 경우, 다운로드 문서에도 정확한 주소가 들어가도록 입력칸을 실제 주소로 교체한다.
+  let addressNote = "";
+  if(base.address){
+    storeAddressInput.value = base.address;
+    addressNote = ` (입력하신 "${addr}"를 실제 주소 "${base.address}"로 자동 변환했습니다.)`;
   }
 
   const ready = await ensureStoreGeocoding();
@@ -692,7 +712,7 @@ nearestBtn.addEventListener("click", async () => {
     rows[i].querySelector(".f-name").title = `직선거리 약 ${s.dist.toFixed(2)}km`;
   });
 
-  nearestStatus.textContent = `가까운 매장 ${ranked.length}곳을 자동으로 채웠습니다 (직선거리 기준).`;
+  nearestStatus.textContent = `가까운 매장 ${ranked.length}곳을 자동으로 채웠습니다 (직선거리 기준).${addressNote}`;
   nearestBtn.disabled = false;
 });
 
